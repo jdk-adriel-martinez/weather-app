@@ -116,6 +116,11 @@
   cursor: pointer;
 }
 
+.weather-app__button:disabled {
+  background: #a8b9e8;
+  cursor: not-allowed;
+}
+
 .weather-app__result {
   border-top: 1px solid #ececec;
   padding-top: 20px;
