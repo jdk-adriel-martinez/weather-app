@@ -1,12 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
+import { getWeatherApiKey } from "@/services/weather";
+
 type WeatherRouteResponse = {
   configured: boolean;
   message: string;
 };
-
-const getWeatherApiKey = () =>
-  process.env.OPENWEATHER_API_KEY ?? process.env.WEATHER_API_KEY;
 
 export default function handler(
   req: NextApiRequest,
