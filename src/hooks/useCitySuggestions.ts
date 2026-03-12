@@ -22,12 +22,15 @@ const initialSuggestionsState: SuggestionsState = {
 
 export function useCitySuggestions() {
   const [city, setCity] = useState("");
+  const [selectedSuggestion, setSelectedSuggestion] =
+    useState<CitySuggestion | null>(null);
   const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
   const [suggestionsState, setSuggestionsState] = useState<SuggestionsState>(
     initialSuggestionsState,
   );
   const fieldRef = useRef<HTMLDivElement | null>(null);
   const skipNextSearchRef = useRef(false);
+  const requestControllerRef = useRef<AbortController | null>(null);
   const trimmedCity = city.trim();
   const debouncedQuery = useDebouncedValue(trimmedCity, 500);
 
@@ -46,71 +49,78 @@ export function useCitySuggestions() {
   }, []);
 
   useEffect(() => {
+    return () => {
+      requestControllerRef.current?.abort();
+    };
+  }, []);
+
+  const fetchSuggestions = async (query: string) => {
+    requestControllerRef.current?.abort();
+
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
+
+    setSuggestionsState({
+      items: [],
+      status: "loading",
+    });
+
+    try {
+      const response = await fetch(`/api/cities?q=${encodeURIComponent(query)}`, {
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error("Could not load city suggestions.");
+      }
+
+      const data = (await response.json()) as {
+        suggestions: CitySuggestion[];
+      };
+
+      if (controller.signal.aborted) {
+        return null;
+      }
+
+      setSuggestionsState({
+        items: data.suggestions,
+        status: data.suggestions.length > 0 ? "success" : "empty",
+      });
+      setIsSuggestionsOpen(true);
+
+      return data.suggestions;
+    } catch (error) {
+      if (controller.signal.aborted) {
+        return null;
+      }
+
+      setSuggestionsState({
+        items: [],
+        message:
+          error instanceof Error
+            ? error.message
+            : "Could not load city suggestions.",
+        status: "error",
+      });
+      setIsSuggestionsOpen(true);
+
+      return null;
+    }
+  };
+
+  useEffect(() => {
     if (skipNextSearchRef.current) {
       skipNextSearchRef.current = false;
       return;
     }
 
     if (debouncedQuery.length < 2) {
+      requestControllerRef.current?.abort();
       setSuggestionsState(initialSuggestionsState);
       return;
     }
 
-    const controller = new AbortController();
-    let isCancelled = false;
-
-    const loadSuggestions = async () => {
-      setSuggestionsState({
-        items: [],
-        status: "loading",
-      });
-
-      try {
-        const response = await fetch(
-          `/api/cities?q=${encodeURIComponent(debouncedQuery)}`,
-          { signal: controller.signal },
-        );
-
-        if (!response.ok) {
-          throw new Error("Could not load city suggestions.");
-        }
-
-        const data = (await response.json()) as {
-          suggestions: CitySuggestion[];
-        };
-
-        if (isCancelled) {
-          return;
-        }
-
-        setSuggestionsState({
-          items: data.suggestions,
-          status: data.suggestions.length > 0 ? "success" : "empty",
-        });
-        setIsSuggestionsOpen(true);
-      } catch (error) {
-        if (controller.signal.aborted || isCancelled) {
-          return;
-        }
-
-        setSuggestionsState({
-          items: [],
-          message:
-            error instanceof Error
-              ? error.message
-              : "Could not load city suggestions.",
-          status: "error",
-        });
-        setIsSuggestionsOpen(true);
-      }
-    };
-
-    void loadSuggestions();
-
-    return () => {
-      isCancelled = true;
-      controller.abort();
-    };
+    void fetchSuggestions(debouncedQuery);
   }, [debouncedQuery]);
 
   const hasCityText = trimmedCity.length > 0;
@@ -120,7 +130,9 @@ export function useCitySuggestions() {
     suggestionsState.status !== "idle";
 
   const handleCityChange = (nextValue: string) => {
+    requestControllerRef.current?.abort();
     setCity(nextValue);
+    setSelectedSuggestion(null);
     setSuggestionsState(initialSuggestionsState);
     setIsSuggestionsOpen(nextValue.trim().length > 0);
   };
@@ -133,24 +145,60 @@ export function useCitySuggestions() {
 
   const handleSuggestionSelect = (suggestion: CitySuggestion) => {
     skipNextSearchRef.current = true;
+    setSelectedSuggestion(suggestion);
     setCity(formatCitySuggestionLabel(suggestion));
     setSuggestionsState(initialSuggestionsState);
     setIsSuggestionsOpen(false);
   };
 
-  const handleSearchClick = () => {
-    if (!hasCityText || suggestionsState.status === "loading") {
-      return;
+  const findBestSuggestionMatch = (suggestions: CitySuggestion[]) => {
+    const normalizedCity = trimmedCity.toLowerCase();
+
+    return (
+      suggestions.find((suggestion) => {
+        const suggestionLabel = formatCitySuggestionLabel(suggestion).toLowerCase();
+
+        return (
+          suggestion.name.toLowerCase() === normalizedCity ||
+          suggestionLabel === normalizedCity
+        );
+      }) ?? suggestions[0]
+    );
+  };
+
+  const resolveSearchCandidate = async () => {
+    if (!hasCityText) {
+      return null;
     }
 
-    if (suggestionsState.status === "idle") {
+    if (selectedSuggestion) {
+      setIsSuggestionsOpen(false);
+      return selectedSuggestion;
+    }
+
+    if (trimmedCity.length < 2) {
       setSuggestionsState({
         items: [],
         status: "empty",
       });
+      setIsSuggestionsOpen(true);
+      return null;
     }
 
-    setIsSuggestionsOpen(true);
+    const suggestions =
+      suggestionsState.status === "success"
+        ? suggestionsState.items
+        : await fetchSuggestions(trimmedCity);
+
+    if (!suggestions || suggestions.length === 0) {
+      return null;
+    }
+
+    const suggestion = findBestSuggestionMatch(suggestions);
+
+    handleSuggestionSelect(suggestion);
+
+    return suggestion;
   };
 
   return {
@@ -158,9 +206,9 @@ export function useCitySuggestions() {
     fieldRef,
     handleCityChange,
     handleCityFocus,
-    handleSearchClick,
     handleSuggestionSelect,
     hasCityText,
+    resolveSearchCandidate,
     showSuggestions,
     suggestionsState,
   };

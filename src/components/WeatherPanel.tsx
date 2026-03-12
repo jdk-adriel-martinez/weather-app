@@ -1,9 +1,8 @@
 import { CitySuggestions } from "@/components/CitySuggestions";
 import { useCitySuggestions } from "@/hooks/useCitySuggestions";
+import { useCurrentWeather } from "@/hooks/useCurrentWeather";
 
 import styles from "./WeatherPanel.module.css";
-
-const weatherResultItems = ["Temperatura", "Humedad", "Descripcion"];
 
 export function WeatherPanel() {
   const {
@@ -11,12 +10,63 @@ export function WeatherPanel() {
     fieldRef,
     handleCityChange,
     handleCityFocus,
-    handleSearchClick,
     handleSuggestionSelect,
     hasCityText,
+    resolveSearchCandidate,
     showSuggestions,
     suggestionsState,
   } = useCitySuggestions();
+  const { loadWeather, weatherState } = useCurrentWeather();
+
+  const handleSuggestionSelectAndLoadWeather = (suggestion: Parameters<
+    typeof handleSuggestionSelect
+  >[0]) => {
+    handleSuggestionSelect(suggestion);
+    void loadWeather(suggestion);
+  };
+
+  const handleSearchButtonClick = async () => {
+    const cityCandidate = await resolveSearchCandidate();
+
+    if (!cityCandidate) {
+      return;
+    }
+
+    void loadWeather(cityCandidate);
+  };
+
+  const weatherResultItems = [
+    {
+      label: "Temperatura",
+      value:
+        weatherState.status === "success"
+          ? `${Math.round(weatherState.weather.temperature)} C`
+          : "--",
+    },
+    {
+      label: "Humedad",
+      value:
+        weatherState.status === "success"
+          ? `${weatherState.weather.humidity}%`
+          : "--",
+    },
+    {
+      label: "Descripcion",
+      value:
+        weatherState.status === "success"
+          ? weatherState.weather.description
+          : "--",
+    },
+  ];
+
+  const weatherStatusMessage =
+    weatherState.status === "idle"
+      ? "Todavia no hay datos cargados."
+      : weatherState.status === "loading"
+        ? "Cargando clima..."
+        : weatherState.status === "error"
+          ? weatherState.message
+          : `Consulta actual: ${weatherState.weather.city}.`;
 
   return (
     <main className={styles["weather-app"]}>
@@ -48,7 +98,7 @@ export function WeatherPanel() {
 
               {showSuggestions ? (
                 <CitySuggestions
-                  onSelect={handleSuggestionSelect}
+                  onSelect={handleSuggestionSelectAndLoadWeather}
                   suggestionsState={suggestionsState}
                 />
               ) : null}
@@ -57,7 +107,9 @@ export function WeatherPanel() {
             <button
               className={styles["weather-app__button"]}
               disabled={!hasCityText}
-              onClick={handleSearchClick}
+              onClick={() => {
+                void handleSearchButtonClick();
+              }}
               type="button"
             >
               Buscar
@@ -72,14 +124,14 @@ export function WeatherPanel() {
           <h2 className={styles["weather-app__result-title"]}>Resultado</h2>
 
           {weatherResultItems.map((label) => (
-            <div className={styles["weather-app__row"]} key={label}>
-              <span className={styles["weather-app__term"]}>{label}</span>
-              <span className={styles["weather-app__value"]}>--</span>
+            <div className={styles["weather-app__row"]} key={label.label}>
+              <span className={styles["weather-app__term"]}>{label.label}</span>
+              <span className={styles["weather-app__value"]}>{label.value}</span>
             </div>
           ))}
 
           <p className={styles["weather-app__empty"]}>
-            Todavia no hay datos cargados.
+            {weatherStatusMessage}
           </p>
         </section>
       </section>
