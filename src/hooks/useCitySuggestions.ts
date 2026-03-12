@@ -4,6 +4,9 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import type { CitySuggestion } from "@/services/weather";
 import { formatCitySuggestionLabel } from "@/utils/formatCitySuggestionLabel";
 
+export const CITY_NOT_FOUND_MESSAGE =
+  "No se encontro ninguna ciudad que coincida con la busqueda.";
+
 export type SuggestionsState =
   | {
       items: CitySuggestion[];
@@ -19,6 +22,32 @@ const initialSuggestionsState: SuggestionsState = {
   items: [],
   status: "idle",
 };
+
+type FetchSuggestionsResult =
+  | {
+      status: "success" | "empty";
+      suggestions: CitySuggestion[];
+    }
+  | {
+      status: "error";
+      message: string;
+    }
+  | {
+      status: "aborted";
+    };
+
+type SearchCandidateResult =
+  | {
+      status: "resolved";
+      suggestion: CitySuggestion;
+    }
+  | {
+      status: "empty" | "error";
+      message: string;
+    }
+  | {
+      status: "aborted";
+    };
 
 export function useCitySuggestions() {
   const [city, setCity] = useState("");
@@ -54,7 +83,9 @@ export function useCitySuggestions() {
     };
   }, []);
 
-  const fetchSuggestions = async (query: string) => {
+  const fetchSuggestions = async (
+    query: string,
+  ): Promise<FetchSuggestionsResult> => {
     requestControllerRef.current?.abort();
 
     const controller = new AbortController();
@@ -79,32 +110,46 @@ export function useCitySuggestions() {
       };
 
       if (controller.signal.aborted) {
-        return null;
+        return {
+          status: "aborted",
+        };
       }
+
+      const nextStatus = data.suggestions.length > 0 ? "success" : "empty";
 
       setSuggestionsState({
         items: data.suggestions,
-        status: data.suggestions.length > 0 ? "success" : "empty",
+        status: nextStatus,
       });
       setIsSuggestionsOpen(true);
 
-      return data.suggestions;
+      return {
+        status: nextStatus,
+        suggestions: data.suggestions,
+      };
     } catch (error) {
       if (controller.signal.aborted) {
-        return null;
+        return {
+          status: "aborted",
+        };
       }
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Could not load city suggestions.";
 
       setSuggestionsState({
         items: [],
-        message:
-          error instanceof Error
-            ? error.message
-            : "Could not load city suggestions.",
+        message,
         status: "error",
       });
       setIsSuggestionsOpen(true);
 
-      return null;
+      return {
+        status: "error",
+        message,
+      };
     }
   };
 
@@ -166,14 +211,20 @@ export function useCitySuggestions() {
     );
   };
 
-  const resolveSearchCandidate = async () => {
+  const resolveSearchCandidate = async (): Promise<SearchCandidateResult> => {
     if (!hasCityText) {
-      return null;
+      return {
+        message: CITY_NOT_FOUND_MESSAGE,
+        status: "empty",
+      };
     }
 
     if (selectedSuggestion) {
       setIsSuggestionsOpen(false);
-      return selectedSuggestion;
+      return {
+        status: "resolved",
+        suggestion: selectedSuggestion,
+      };
     }
 
     if (trimmedCity.length < 2) {
@@ -182,23 +233,48 @@ export function useCitySuggestions() {
         status: "empty",
       });
       setIsSuggestionsOpen(true);
-      return null;
+      return {
+        message: CITY_NOT_FOUND_MESSAGE,
+        status: "empty",
+      };
     }
 
-    const suggestions =
+    const suggestionsResult =
       suggestionsState.status === "success"
-        ? suggestionsState.items
+        ? {
+            status: "success" as const,
+            suggestions: suggestionsState.items,
+          }
         : await fetchSuggestions(trimmedCity);
 
-    if (!suggestions || suggestions.length === 0) {
-      return null;
+    if (suggestionsResult.status === "aborted") {
+      return {
+        status: "aborted",
+      };
     }
 
-    const suggestion = findBestSuggestionMatch(suggestions);
+    if (suggestionsResult.status === "error") {
+      return {
+        message: suggestionsResult.message,
+        status: "error",
+      };
+    }
+
+    if (suggestionsResult.suggestions.length === 0) {
+      return {
+        message: CITY_NOT_FOUND_MESSAGE,
+        status: "empty",
+      };
+    }
+
+    const suggestion = findBestSuggestionMatch(suggestionsResult.suggestions);
 
     handleSuggestionSelect(suggestion);
 
-    return suggestion;
+    return {
+      status: "resolved",
+      suggestion,
+    };
   };
 
   return {

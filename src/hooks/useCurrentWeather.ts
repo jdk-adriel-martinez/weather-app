@@ -88,8 +88,19 @@ export function useCurrentWeather() {
     }
   };
 
+  const setWeatherError = (message: string) => {
+    requestControllerRef.current?.abort();
+
+    setWeatherState({
+      message,
+      status: "error",
+      weather: null,
+    });
+  };
+
   return {
     loadWeather,
+    setWeatherError,
     weatherState,
   };
 }

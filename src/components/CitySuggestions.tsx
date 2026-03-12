@@ -1,4 +1,7 @@
-import type { SuggestionsState } from "@/hooks/useCitySuggestions";
+import {
+  CITY_NOT_FOUND_MESSAGE,
+  type SuggestionsState,
+} from "@/hooks/useCitySuggestions";
 import type { CitySuggestion } from "@/services/weather";
 import { formatCitySuggestionLabel } from "@/utils/formatCitySuggestionLabel";
 
@@ -29,7 +32,7 @@ export function CitySuggestions({
 
       {suggestionsState.status === "empty" ? (
         <p className={styles["weather-app__suggestion-status"]}>
-          No se encontraron resultados.
+          {CITY_NOT_FOUND_MESSAGE}
         </p>
       ) : null}
 

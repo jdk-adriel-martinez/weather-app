@@ -1,5 +1,10 @@
+import type { FormEvent } from "react";
+
 import { CitySuggestions } from "@/components/CitySuggestions";
-import { useCitySuggestions } from "@/hooks/useCitySuggestions";
+import {
+  CITY_NOT_FOUND_MESSAGE,
+  useCitySuggestions,
+} from "@/hooks/useCitySuggestions";
 import { useCurrentWeather } from "@/hooks/useCurrentWeather";
 
 import styles from "./WeatherPanel.module.css";
@@ -16,7 +21,7 @@ export function WeatherPanel() {
     showSuggestions,
     suggestionsState,
   } = useCitySuggestions();
-  const { loadWeather, weatherState } = useCurrentWeather();
+  const { loadWeather, setWeatherError, weatherState } = useCurrentWeather();
 
   const handleSuggestionSelectAndLoadWeather = (suggestion: Parameters<
     typeof handleSuggestionSelect
@@ -26,47 +31,33 @@ export function WeatherPanel() {
   };
 
   const handleSearchButtonClick = async () => {
-    const cityCandidate = await resolveSearchCandidate();
+    const searchCandidateResult = await resolveSearchCandidate();
 
-    if (!cityCandidate) {
+    if (searchCandidateResult.status === "aborted") {
       return;
     }
 
-    void loadWeather(cityCandidate);
+    if (searchCandidateResult.status !== "resolved") {
+      setWeatherError(searchCandidateResult.message);
+      return;
+    }
+
+    void loadWeather(searchCandidateResult.suggestion);
   };
 
-  const weatherResultItems = [
-    {
-      label: "Temperatura",
-      value:
-        weatherState.status === "success"
-          ? `${Math.round(weatherState.weather.temperature)} C`
-          : "--",
-    },
-    {
-      label: "Humedad",
-      value:
-        weatherState.status === "success"
-          ? `${weatherState.weather.humidity}%`
-          : "--",
-    },
-    {
-      label: "Descripcion",
-      value:
-        weatherState.status === "success"
-          ? weatherState.weather.description
-          : "--",
-    },
-  ];
+  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
-  const weatherStatusMessage =
-    weatherState.status === "idle"
-      ? "Todavia no hay datos cargados."
-      : weatherState.status === "loading"
-        ? "Cargando clima..."
-        : weatherState.status === "error"
-          ? weatherState.message
-          : `Consulta actual: ${weatherState.weather.city}.`;
+    if (!hasCityText) {
+      return;
+    }
+
+    void handleSearchButtonClick();
+  };
+
+  const isNotFoundError =
+    weatherState.status === "error" &&
+    weatherState.message === CITY_NOT_FOUND_MESSAGE;
 
   return (
     <main className={styles["weather-app"]}>
@@ -78,7 +69,10 @@ export function WeatherPanel() {
           </p>
         </header>
 
-        <form className={styles["weather-app__form"]}>
+        <form
+          className={styles["weather-app__form"]}
+          onSubmit={handleSearchSubmit}
+        >
           <label className={styles["weather-app__label"]} htmlFor="city">
             Ciudad
           </label>
@@ -107,33 +101,89 @@ export function WeatherPanel() {
             <button
               className={styles["weather-app__button"]}
               disabled={!hasCityText}
-              onClick={() => {
-                void handleSearchButtonClick();
-              }}
-              type="button"
+              type="submit"
             >
               Buscar
             </button>
           </div>
         </form>
 
-        <section
-          aria-label="Resultado del clima"
-          className={styles["weather-app__result"]}
-        >
-          <h2 className={styles["weather-app__result-title"]}>Resultado</h2>
+        {weatherState.status === "success" ? (
+          <section
+            aria-label="Resultado del clima"
+            className={styles["weather-app__result"]}
+          >
+            <h2 className={styles["weather-app__result-title"]}>Resultado</h2>
 
-          {weatherResultItems.map((label) => (
-            <div className={styles["weather-app__row"]} key={label.label}>
-              <span className={styles["weather-app__term"]}>{label.label}</span>
-              <span className={styles["weather-app__value"]}>{label.value}</span>
+            <div className={styles["weather-app__row"]}>
+              <span className={styles["weather-app__term"]}>Temperatura</span>
+              <span className={styles["weather-app__value"]}>
+                {Math.round(weatherState.weather.temperature)} C
+              </span>
             </div>
-          ))}
 
-          <p className={styles["weather-app__empty"]}>
-            {weatherStatusMessage}
-          </p>
-        </section>
+            <div className={styles["weather-app__row"]}>
+              <span className={styles["weather-app__term"]}>Humedad</span>
+              <span className={styles["weather-app__value"]}>
+                {weatherState.weather.humidity}%
+              </span>
+            </div>
+
+            <div className={styles["weather-app__row"]}>
+              <span className={styles["weather-app__term"]}>Descripcion</span>
+              <span className={styles["weather-app__value"]}>
+                {weatherState.weather.description}
+              </span>
+            </div>
+
+            <p className={styles["weather-app__result-summary"]}>
+              Consulta actual: {weatherState.weather.city}.
+            </p>
+          </section>
+        ) : weatherState.status === "error" ? (
+          <section
+            aria-label="Estado de error"
+            aria-live="polite"
+            className={styles["weather-app__result"]}
+          >
+            <div
+              className={`${styles["weather-app__state"]} ${styles["weather-app__state--error"]}`}
+            >
+              <h2 className={styles["weather-app__state-title"]}>
+                {isNotFoundError
+                  ? "No se encontro la ciudad"
+                  : "No pudimos completar la busqueda"}
+              </h2>
+              <p className={styles["weather-app__state-copy"]}>
+                {weatherState.message}
+              </p>
+              <p className={styles["weather-app__state-copy"]}>
+                {isNotFoundError
+                  ? "Prueba con otro nombre o elige una coincidencia del listado."
+                  : "Intenta nuevamente en unos segundos."}
+              </p>
+            </div>
+          </section>
+        ) : (
+          <section
+            aria-label="Estado inicial"
+            aria-live="polite"
+            className={styles["weather-app__result"]}
+          >
+            <div className={styles["weather-app__state"]}>
+              <h2 className={styles["weather-app__state-title"]}>
+                {weatherState.status === "loading"
+                  ? "Buscando el clima"
+                  : "Haz una busqueda"}
+              </h2>
+              <p className={styles["weather-app__state-copy"]}>
+                {weatherState.status === "loading"
+                  ? "Estamos consultando el clima actual para mostrarte los datos mas recientes."
+                  : "Escribe una ciudad y presiona Buscar para ver temperatura, humedad y descripcion."}
+              </p>
+            </div>
+          </section>
+        )}
       </section>
     </main>
   );

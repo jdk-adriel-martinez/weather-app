@@ -132,6 +132,33 @@
   margin-bottom: 16px;
 }
 
+.weather-app__state {
+  border: 1px solid #ececec;
+  border-radius: 10px;
+  background: #fafafa;
+  padding: 20px;
+}
+
+.weather-app__state--error {
+  border-color: #efc6c6;
+  background: #fff5f5;
+}
+
+.weather-app__state-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.weather-app__state-copy {
+  color: #5f5f5f;
+  font-size: 0.95rem;
+}
+
+.weather-app__state-copy + .weather-app__state-copy {
+  margin-top: 8px;
+}
+
 .weather-app__row {
   display: flex;
   justify-content: space-between;
@@ -153,7 +180,7 @@
   font-weight: 600;
 }
 
-.weather-app__empty {
+.weather-app__result-summary {
   margin-top: 16px;
   color: #6a6a6a;
   font-size: 0.95rem;
