@@ -1,40 +1,123 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# Weather App
 
-## Getting Started
+Aplicacion de clima construida con Next.js para consultar el clima actual de una ciudad.
 
-First, run the development server:
+La app permite:
+- buscar una ciudad
+- ver temperatura actual
+- ver humedad
+- ver una descripcion breve del clima
+- manejar errores cuando la ciudad no existe o la consulta falla
+
+## Requisitos previos
+
+- Node.js `>= 20.9.0`
+- `pnpm` instalado
+- una API key de OpenWeatherMap
+
+## Instalacion
+
+Desde la carpeta del proyecto:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd weather-app
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Variables de entorno
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+Crea un archivo `.env.local` en la raiz del proyecto con:
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+```env
+OPENWEATHER_API_KEY=tu_api_key
+```
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
+Notas:
+- `OPENWEATHER_API_KEY` es la variable recomendada.
+- El proyecto tambien acepta `WEATHER_API_KEY` como fallback.
+- La API key se usa del lado del servidor a traves de las rutas internas de Next.js.
 
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Ejecutar en desarrollo
 
-## Learn More
+```bash
+pnpm dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Luego abre:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
+```text
+http://localhost:3000
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Ejecutar en produccion
 
-## Deploy on Vercel
+Compilar:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+pnpm build
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+Levantar el servidor compilado:
+
+```bash
+pnpm start
+```
+
+## Pruebas
+
+Ejecutar todos los tests:
+
+```bash
+pnpm test
+```
+
+Ejecutar tests en modo watch:
+
+```bash
+pnpm test:watch
+```
+
+Generar reporte de cobertura:
+
+```bash
+pnpm test:coverage
+```
+
+## Cobertura minima
+
+El proyecto esta configurado con Jest para exigir una cobertura global minima del `80%` en:
+
+- `statements`
+- `branches`
+- `functions`
+- `lines`
+
+## Que validan las pruebas
+
+Las pruebas cubren los puntos principales del ejercicio:
+
+- la busqueda exitosa y la visualizacion del clima
+- el manejo de error cuando la ciudad es invalida
+- el funcionamiento del input y del boton de busqueda
+
+Ademas, tambien se prueban hooks, servicios y rutas API internas.
+
+## Comandos utiles
+
+```bash
+pnpm dev
+pnpm build
+pnpm start
+pnpm lint
+pnpm test
+pnpm test:watch
+pnpm test:coverage
+```
+
+## Problemas comunes
+
+Si la app no devuelve resultados, revisa primero:
+
+- que `.env.local` exista en la raiz del proyecto
+- que `OPENWEATHER_API_KEY` tenga un valor valido
+- que hayas reiniciado el servidor despues de cambiar variables de entorno
